@@ -37,7 +37,6 @@ static int sock_connect(const char *servername, int port) {
   char service[6];
   int sockfd = -1;
   int listenfd = 0;
-  int tmp;
   struct addrinfo hints = {
       .ai_flags = AI_PASSIVE, .ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
   if (sprintf(service, "%d", port) < 0)
@@ -55,10 +54,11 @@ static int sock_connect(const char *servername, int port) {
     if (sockfd >= 0) {
       if (servername) {
         /* Client mode. Initiate connection to remote */
-        if ((tmp = connect(sockfd, iterator->ai_addr, iterator->ai_addrlen))) {
-          PRINT("failed connect \n");
-          close(sockfd);
-          sockfd = -1;
+        while (connect(sockfd, iterator->ai_addr, iterator->ai_addrlen)) {
+          usleep(10 * 1000); // 10ms
+          //PRINT("failed connect \n");
+          //close(sockfd);
+          //sockfd = -1;
         }
       } else {
         /* Server mode. Set up listening socket an accept a connection */
@@ -78,10 +78,10 @@ sock_connect_exit:
     freeaddrinfo(resolved_addr);
   if (sockfd < 0) {
     if (servername)
-      PRINT_ERR( "Couldn't connect to %s:%d\n", servername, port);
+      PRINT_ERR("Couldn't connect to %s:%d\n", servername, port);
     else {
       perror("server accept");
-      PRINT_ERR( "accept() failed\n");
+      PRINT_ERR("accept() failed\n");
     }
   }
   return sockfd;
@@ -94,7 +94,7 @@ int sock_sync_data(int sock, int xfer_size, char *local_data,
   int total_read_bytes = 0;
   rc = write(sock, local_data, xfer_size);
   if (rc < xfer_size)
-    PRINT_ERR( "Failed writing data during sock_sync_data\n");
+    PRINT_ERR("Failed writing data during sock_sync_data\n");
   else
     rc = 0;
   while (!rc && total_read_bytes < xfer_size) {
@@ -129,13 +129,12 @@ static int poll_completion(struct resources *res) {
   size_t t1 = get_timestamp();
   PRINT_TIME("ibv_poll_cq", t1 - t0);
 
-
   if (poll_result < 0) {
     /* poll CQ failed */
-    PRINT_ERR( "poll CQ failed\n");
+    PRINT_ERR("poll CQ failed\n");
     rc = 1;
   } else if (poll_result == 0) { /* the CQ is empty */
-    PRINT_ERR( "completion wasn't found in the CQ after timeout\n");
+    PRINT_ERR("completion wasn't found in the CQ after timeout\n");
     rc = 1;
   } else {
     /* CQE found */
@@ -143,9 +142,8 @@ static int poll_completion(struct resources *res) {
     /* check the completion status (here we don't care about the completion
      * opcode */
     if (wc.status != IBV_WC_SUCCESS) {
-      PRINT_ERR(
-              "got bad completion with status: 0x%x, vendor syndrome: 0x%x\n",
-              wc.status, wc.vendor_err);
+      PRINT_ERR("got bad completion with status: 0x%x, vendor syndrome: 0x%x\n",
+                wc.status, wc.vendor_err);
       rc = 1;
     }
   }
@@ -176,8 +174,8 @@ static int post_send(struct resources *res, int opcode) {
   }
   /* there is a Receive Request in the responder side, so we won't get any into
    * RNR flow */
-  LOG_TIME_CHECK(rc = ibv_post_send(res->qp, &sr, &bad_wr),
-          "ibv_post_send", rc == 0);
+  LOG_TIME_CHECK(rc = ibv_post_send(res->qp, &sr, &bad_wr), "ibv_post_send",
+                 rc == 0);
 
   if (!rc) {
     switch (opcode) {
@@ -214,8 +212,8 @@ static int post_receive(struct resources *res) {
   rr.sg_list = &sge;
   rr.num_sge = 1;
   /* post the Receive Request to the RQ */
-  LOG_TIME_CHECK(rc = ibv_post_recv(res->qp, &rr, &bad_wr),
-          "ibv_post_recv", rc == 0);
+  LOG_TIME_CHECK(rc = ibv_post_recv(res->qp, &rr, &bad_wr), "ibv_post_recv",
+                 rc == 0);
 
   return rc;
 }
@@ -229,9 +227,8 @@ static int sock_create(struct resources *res) {
   if (config.server_name) {
     res->sock = sock_connect(config.server_name, config.tcp_port);
     if (res->sock < 0) {
-      PRINT_ERR(
-              "failed to establish TCP connection to server %s, port %d\n",
-              config.server_name, config.tcp_port);
+      PRINT_ERR("failed to establish TCP connection to server %s, port %d\n",
+                config.server_name, config.tcp_port);
       rc = -1;
       goto sock_create_exit;
     }
@@ -239,9 +236,8 @@ static int sock_create(struct resources *res) {
     PRINT("waiting on port %d for TCP connection\n", config.tcp_port);
     res->sock = sock_connect(NULL, config.tcp_port);
     if (res->sock < 0) {
-      PRINT_ERR(
-              "failed to establish TCP connection with client on port %d\n",
-              config.tcp_port);
+      PRINT_ERR("failed to establish TCP connection with client on port %d\n",
+                config.tcp_port);
       rc = -1;
       goto sock_create_exit;
     }
@@ -251,7 +247,7 @@ static int sock_create(struct resources *res) {
 sock_create_exit:
   if (res->sock >= 0) {
     if (close(res->sock))
-      PRINT_ERR( "failed to close socket\n");
+      PRINT_ERR("failed to close socket\n");
     res->sock = -1;
   }
   return rc;
@@ -270,7 +266,7 @@ static int resources_create(struct resources *res) {
   PRINT("searching for IB devices in host\n");
   /* get device names in the system */
   LOG_TIME_CHECK(dev_list = ibv_get_device_list(&num_devices),
-          "ibv_get_device_list", dev_list);
+                 "ibv_get_device_list", dev_list);
 
   if (!dev_list) {
     rc = 1;
@@ -278,7 +274,7 @@ static int resources_create(struct resources *res) {
   }
   /* if there isn't any IB device in host */
   if (!num_devices) {
-    PRINT_ERR( "found %d device(s)\n", num_devices);
+    PRINT_ERR("found %d device(s)\n", num_devices);
     rc = 1;
     goto resources_create_exit;
   }
@@ -288,7 +284,7 @@ static int resources_create(struct resources *res) {
     if (!config.dev_name) {
       config.dev_name = strdup(ibv_get_device_name(dev_list[i]));
       PRINT("device not specified, using first one found: %s\n",
-              config.dev_name);
+            config.dev_name);
     }
     if (!strcmp(ibv_get_device_name(dev_list[i]), config.dev_name)) {
       ib_dev = dev_list[i];
@@ -297,7 +293,7 @@ static int resources_create(struct resources *res) {
   }
   /* if the device wasn't found in host */
   if (!ib_dev) {
-    PRINT_ERR( "IB device %s wasn't found\n", config.dev_name);
+    PRINT_ERR("IB device %s wasn't found\n", config.dev_name);
     rc = 1;
     goto resources_create_exit;
   }
@@ -305,7 +301,7 @@ static int resources_create(struct resources *res) {
   LOG_TIME(res->ib_ctx = ibv_open_device(ib_dev), "ibv_open_device");
 
   if (!res->ib_ctx) {
-    PRINT_ERR( "failed to open device %s\n", config.dev_name);
+    PRINT_ERR("failed to open device %s\n", config.dev_name);
     rc = 1;
     goto resources_create_exit;
   }
@@ -315,7 +311,7 @@ static int resources_create(struct resources *res) {
   ib_dev = NULL;
   /* query port properties */
   if (ibv_query_port(res->ib_ctx, config.ib_port, &res->port_attr)) {
-    PRINT_ERR( "ibv_query_port on port %u failed\n", config.ib_port);
+    PRINT_ERR("ibv_query_port on port %u failed\n", config.ib_port);
     rc = 1;
     goto resources_create_exit;
   }
@@ -323,7 +319,7 @@ static int resources_create(struct resources *res) {
   LOG_TIME(res->pd = ibv_alloc_pd(res->ib_ctx), "ibv_alloc_pd");
 
   if (!res->pd) {
-    PRINT_ERR( "ibv_alloc_pd failed\n");
+    PRINT_ERR("ibv_alloc_pd failed\n");
     rc = 1;
     goto resources_create_exit;
   }
@@ -331,9 +327,9 @@ static int resources_create(struct resources *res) {
    */
   cq_size = 1;
   LOG_TIME(res->cq = ibv_create_cq(res->ib_ctx, cq_size, NULL, NULL, 0),
-          "ibv_create_cq");
+           "ibv_create_cq");
   if (!res->cq) {
-    PRINT_ERR( "failed to create CQ with %u entries\n", cq_size);
+    PRINT_ERR("failed to create CQ with %u entries\n", cq_size);
     rc = 1;
     goto resources_create_exit;
   }
@@ -342,7 +338,7 @@ static int resources_create(struct resources *res) {
   res->buf = (char *)malloc(size);
   PRINT("MSG_SIZE: %zu\n", MSG_SIZE);
   if (!res->buf) {
-    PRINT_ERR( "failed to malloc %Zu bytes to memory buffer\n", size);
+    PRINT_ERR("failed to malloc %Zu bytes to memory buffer\n", size);
     rc = 1;
     goto resources_create_exit;
   }
@@ -357,16 +353,15 @@ static int resources_create(struct resources *res) {
   mr_flags =
       IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
   LOG_TIME(res->mr = ibv_reg_mr(res->pd, res->buf, size, mr_flags),
-          "ibv_reg_mr");
+           "ibv_reg_mr");
 
   if (!res->mr) {
-    PRINT_ERR( "ibv_reg_mr failed with mr_flags=0x%x\n", mr_flags);
+    PRINT_ERR("ibv_reg_mr failed with mr_flags=0x%x\n", mr_flags);
     rc = 1;
     goto resources_create_exit;
   }
-  PRINT(
-          "MR was registered with addr=%p, lkey=0x%x, rkey=0x%x, flags=0x%x\n",
-          res->buf, res->mr->lkey, res->mr->rkey, mr_flags);
+  PRINT("MR was registered with addr=%p, lkey=0x%x, rkey=0x%x, flags=0x%x\n",
+        res->buf, res->mr->lkey, res->mr->rkey, mr_flags);
   /* create the Queue Pair */
   memset(&qp_init_attr, 0, sizeof(qp_init_attr));
   qp_init_attr.qp_type = IBV_QPT_RC;
@@ -381,7 +376,7 @@ static int resources_create(struct resources *res) {
   LOG_TIME(res->qp = ibv_create_qp(res->pd, &qp_init_attr), "ibv_create_qp");
 
   if (!res->qp) {
-    PRINT_ERR( "failed to create QP\n");
+    PRINT_ERR("failed to create QP\n");
     rc = 1;
     goto resources_create_exit;
   }
@@ -431,8 +426,8 @@ static int modify_qp_to_init(struct ibv_qp *qp) {
   attr.qp_access_flags =
       IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
   flags = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
-  LOG_TIME_CHECK(rc = ibv_modify_qp(qp, &attr, flags),
-          "ibv_modify_qp(init)", rc == 0);
+  LOG_TIME_CHECK(rc = ibv_modify_qp(qp, &attr, flags), "ibv_modify_qp(init)",
+                 rc == 0);
   return rc;
 }
 static int modify_qp_to_rtr(struct ibv_qp *qp, uint32_t remote_qpn,
@@ -463,8 +458,8 @@ static int modify_qp_to_rtr(struct ibv_qp *qp, uint32_t remote_qpn,
   }
   flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN |
           IBV_QP_RQ_PSN | IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER;
-  LOG_TIME_CHECK(rc = ibv_modify_qp(qp, &attr, flags),
-          "ibv_modify_qp(rtr)", rc == 0);
+  LOG_TIME_CHECK(rc = ibv_modify_qp(qp, &attr, flags), "ibv_modify_qp(rtr)",
+                 rc == 0);
   return rc;
 }
 static int modify_qp_to_rts(struct ibv_qp *qp) {
@@ -480,8 +475,8 @@ static int modify_qp_to_rts(struct ibv_qp *qp) {
   attr.max_rd_atomic = 1;
   flags = IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY |
           IBV_QP_SQ_PSN | IBV_QP_MAX_QP_RD_ATOMIC;
-  LOG_TIME_CHECK(rc = ibv_modify_qp(qp, &attr, flags),
-          "ibv_modify_qp(rts)", rc == 0);
+  LOG_TIME_CHECK(rc = ibv_modify_qp(qp, &attr, flags), "ibv_modify_qp(rts)",
+                 rc == 0);
   return rc;
 }
 
@@ -493,11 +488,11 @@ static int connect_qp(struct resources *res) {
   char temp_char;
   union ibv_gid my_gid;
   if (config.gid_idx >= 0) {
-    LOG_TIME(rc = ibv_query_gid(res->ib_ctx, config.ib_port,
-                config.gid_idx, &my_gid),
-            "ibv_query_gid");
+    LOG_TIME(rc = ibv_query_gid(res->ib_ctx, config.ib_port, config.gid_idx,
+                                &my_gid),
+             "ibv_query_gid");
     RDMA_CHECK(0 == rc, "could not get gid for port %d, index %d",
-            config.ib_port, config.gid_idx);
+               config.ib_port, config.gid_idx);
     return rc;
   } else {
     memset(&my_gid, 0, sizeof my_gid);
@@ -510,9 +505,10 @@ static int connect_qp(struct resources *res) {
   local_con_data.lid = htons(res->port_attr.lid);
   memcpy(local_con_data.gid, &my_gid, 16);
   PRINT("\nLocal LID = 0x%x\n", res->port_attr.lid);
-  RDMA_CHECK_GOTO(0 == sock_sync_data(res->sock, sizeof(struct cm_con_data_t),
-                     (char *)&local_con_data, (char *)&tmp_con_data),
-    "failed to exchange connection data between sides", connect_qp_exit);
+  RDMA_CHECK_GOTO(
+      0 == sock_sync_data(res->sock, sizeof(struct cm_con_data_t),
+                          (char *)&local_con_data, (char *)&tmp_con_data),
+      "failed to exchange connection data between sides", connect_qp_exit);
 
   remote_con_data.addr = ntohll(tmp_con_data.addr);
   remote_con_data.rkey = ntohl(tmp_con_data.rkey);
@@ -527,34 +523,36 @@ static int connect_qp(struct resources *res) {
   PRINT("Remote LID = 0x%x\n", remote_con_data.lid);
   if (config.gid_idx >= 0) {
     uint8_t *p = remote_con_data.gid;
-    PRINT(
-            "Remote GID "
-            "=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:"
-            "%02x:%02x:%02x\n ",
-            p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10],
-            p[11], p[12], p[13], p[14], p[15]);
+    PRINT("Remote GID "
+          "=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:"
+          "%02x:%02x:%02x\n ",
+          p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10],
+          p[11], p[12], p[13], p[14], p[15]);
   }
   /* modify the QP to init */
   RDMA_CHECK_GOTO(0 == modify_qp_to_init(res->qp),
-          "change QP state to INIT failed", connect_qp_exit);
+                  "change QP state to INIT failed", connect_qp_exit);
 
   /* let the client post RR to be prepared for incoming messages */
   if (config.server_name) {
-      RDMA_CHECK_GOTO(0 == post_receive(res), "failed to post RR", connect_qp_exit);
+    RDMA_CHECK_GOTO(0 == post_receive(res), "failed to post RR",
+                    connect_qp_exit);
   }
 
   /* modify the QP to RTR */
   RDMA_CHECK_GOTO(0 == modify_qp_to_rtr(res->qp, remote_con_data.qp_num,
-              remote_con_data.lid, remote_con_data.gid),
-          "failed to modify QP state to RTR", connect_qp_exit);
+                                        remote_con_data.lid,
+                                        remote_con_data.gid),
+                  "failed to modify QP state to RTR", connect_qp_exit);
 
   RDMA_CHECK_GOTO(0 == modify_qp_to_rts(res->qp),
-          "failed to modify QP state to RTS", connect_qp_exit);
+                  "failed to modify QP state to RTS", connect_qp_exit);
 
   /* sync to make sure that both sides are in states that they can connect to
    * prevent packet loose; just send a dummy char back and forth */
   RDMA_CHECK_GOTO(0 == sock_sync_data(res->sock, 1, "Q", &temp_char),
-          "sync error after QPs are were moved to RTS", connect_qp_exit);
+                  "sync error after QPs are were moved to RTS",
+                  connect_qp_exit);
 
 connect_qp_exit:
   return rc;
@@ -562,27 +560,27 @@ connect_qp_exit:
 static int resources_destroy(struct resources *res) {
   int rc = 0;
   if (res->qp) {
-      int ret;
+    int ret;
     LOG_TIME_CHECK(ret = ibv_destroy_qp(res->qp), "ibv_destroy_qp", ret == 0);
   }
   if (res->mr) {
-      int ret;
+    int ret;
     LOG_TIME_CHECK(ret = ibv_dereg_mr(res->mr), "ibv_dereg_mr", ret == 0);
   }
   if (res->buf)
     free(res->buf);
   if (res->cq) {
-      int ret;
+    int ret;
     LOG_TIME_CHECK(ret = ibv_destroy_cq(res->cq), "ibv_destroy_cq", ret == 0);
   }
   if (res->pd) {
-      int ret;
+    int ret;
     LOG_TIME_CHECK(ret = ibv_dealloc_pd(res->pd), "ibv_dealloc_pd", ret == 0);
   }
   if (res->ib_ctx) {
-      int ret;
-      LOG_TIME_CHECK(ret = ibv_close_device(res->ib_ctx),
-            "ibv_close_device", ret == 0);
+    int ret;
+    LOG_TIME_CHECK(ret = ibv_close_device(res->ib_ctx), "ibv_close_device",
+                   ret == 0);
   }
   return rc;
 }
@@ -620,10 +618,9 @@ static void usage(const char *argv0) {
   PRINT(
       stdout,
       " -d, --ib-dev <dev> use IB device <dev> (default first device found)\n");
-  PRINT(
-          " -i, --ib-port <port> use port <port> of IB device (default 1)\n");
+  PRINT(" -i, --ib-port <port> use port <port> of IB device (default 1)\n");
   PRINT(" -g, --gid_idx <git index> gid index to be used in GRH "
-                  "(default not used)\n");
+        "(default not used)\n");
   PRINT(" -s, --size <size> use size <size> for transport data size\n");
   PRINT(" -l, --loop <loop number> use <loop number> for test loop number\n");
 }
@@ -712,29 +709,45 @@ int main(int argc, char *argv[]) {
 
   RDMA_CHECK_GOTO(0 == sock_create(&res), "failed to create sock", main_exit);
 
+  double sum_time;   // sum of all time
+  double sum10_time; // sum of 10 iterations time
   for (int i = 0; i < LOOP; ++i) {
-    RDMA_CHECK_GOTO(0 == resources_create(&res), "failed to create resources", main_exit);
+    size_t _t = get_timestamp();
+    RDMA_CHECK_GOTO(0 == resources_create(&res), "failed to create resources",
+                    main_exit);
     /* connect the QPs */
     RDMA_CHECK_GOTO(0 == connect_qp(&res), "failed to connect QPs", main_exit);
     /* let the server post the sr */
     if (!config.server_name) {
-        RDMA_CHECK_GOTO(0 == post_send(&res, IBV_WR_SEND), "failed to post sr", main_exit);
+      RDMA_CHECK_GOTO(0 == post_send(&res, IBV_WR_SEND), "failed to post sr",
+                      main_exit);
     }
     /* in both sides we expect to get a completion */
-    RDMA_CHECK_GOTO(0 == poll_completion(&res), "poll completion failed", main_exit);
+    RDMA_CHECK_GOTO(0 == poll_completion(&res), "poll completion failed",
+                    main_exit);
 
     /* Sync so we are sure server side has data ready before client tries to
      * read it; just send a dummy char back and forth */
     RDMA_CHECK_GOTO(0 == sock_sync_data(res.sock, 1, "R", &temp_char),
-            "sync error before RDMA ops", main_exit);
+                    "sync error before RDMA ops", main_exit);
 
     RDMA_CHECK(0 == resources_destroy(&res), "failed to destroy resources");
     rc = 0;
+
+    _t = get_timestamp() - _t;
+    sum_time += _t;
+    sum10_time += _t;
+    if (i % 10 == 9) {
+      fprintf(stderr,
+              "[Packet-%ld][%d/%ld] TEN_ITER_AVG(ms): %.2lf, AVG_TIME(ms): %.2lf\n",
+              MSG_SIZE, i + 1, LOOP, sum10_time / 10.0 / 1000.0, sum_time / (i + 1) / 1000.0);
+      sum10_time = 0;
+    }
   } // end for
 
 main_exit:
   if (rc != 0) {
-      RDMA_CHECK(0 == resources_destroy(&res), "failed to destroy resources");
+    RDMA_CHECK(0 == resources_destroy(&res), "failed to destroy resources");
   }
 
   RDMA_CHECK(0 == sock_destroy(&res), "failed to destroy socket resources");
@@ -742,9 +755,9 @@ main_exit:
   if (config.dev_name)
     free((char *)config.dev_name);
   if (rc == 0) {
-      PRINT_OK("\ntest result is OK\n");
+    PRINT_OK("\ntest result is OK\n");
   } else {
-      PRINT_ERR("\ntest result is ERROR\n");
+    PRINT_ERR("\ntest result is ERROR\n");
   }
   return rc;
 }
