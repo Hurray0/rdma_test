@@ -1,8 +1,6 @@
 # RDMA Manual
 RDMA test case and benchmark.
 
-[TOC]
-
 Author: hurray0@qq.com
 
 ## Benchmark HOW_TO_USE
@@ -19,6 +17,7 @@ Author: hurray0@qq.com
 * `-n` log unique name, default: timestamp
 * `-P` server port, default: 19875
 * `-I` server ip
+* `-d` mellanox HCA
 * `-s` whether it is the server
 
 ### exmample

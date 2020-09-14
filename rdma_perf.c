@@ -612,12 +612,8 @@ static void usage(const char *argv0) {
   PRINT(" %s <host> connect to server at <host>\n", argv0);
   PRINT("\n");
   PRINT("Options:\n");
-  PRINT(
-      stdout,
-      " -p, --port <port> listen on/connect to port <port> (default 18515)\n");
-  PRINT(
-      stdout,
-      " -d, --ib-dev <dev> use IB device <dev> (default first device found)\n");
+  PRINT(" -p, --port <port> listen on/connect to port <port> (default 18515)\n");
+  PRINT(" -d, --ib-dev <dev> use IB device <dev> (default first device found)\n");
   PRINT(" -i, --ib-port <port> use port <port> of IB device (default 1)\n");
   PRINT(" -g, --gid_idx <git index> gid index to be used in GRH "
         "(default not used)\n");
