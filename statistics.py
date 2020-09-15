@@ -38,6 +38,7 @@ def _draw_data(data: dict, size: int, dirname: str):
 
     # for every ibverb(every size), draw histgram
     for ibv_name in data:
+        plt.figure(dpi=300)
         time_list = data[ibv_name]
         plt.hist(time_list, bins=50)
         plt.title("ibverb " + ibv_name + " latency distribution")

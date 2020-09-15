@@ -1,4 +1,4 @@
-# RDMA Manual
+# RDMA ibverbs benchmark
 RDMA test case and benchmark.
 
 Author: hurray0@qq.com
@@ -10,24 +10,32 @@ Author: hurray0@qq.com
 ```
 
 ### args description
-* `-M` maximum data size, default: 33554432(32MB)
-* `-m` minimum data size, default: 1024(1KB)
+* `-M` maximum data size, default: 268435456(256MB)
+* `-m` minimum data size, default: 1(1B)
 * `-p` multiple factor for size, default: 4
 * `-l` loop number (iteration number), default: 1000
 * `-n` log unique name, default: timestamp
 * `-P` server port, default: 19875
 * `-I` server ip
-* `-d` mellanox HCA
+* `-d` mellanox HCA (ib dev)
+* `-g` IB gid index if using RoCE, default: -1(IB) 
 * `-s` whether it is the server
 
 ### exmample
 ```bash
 # server
-./benchmark.sh -m 1 -M 1073741824 -p 4 -l 1000 -n first -s
+./benchmark.sh -n first -s
 
 # client
-./benchmark.sh -m 1 -M 1073741824 -p 4 -l 1000 -n first -I 172.16.13.217
+./benchmark.sh -n first -I 172.16.13.217
 ```
+
+### result
+The result include detaild ibverbs latency statistics, and some image to provide better view.
+For example:
+
+![](./docs/all_bar.png)
+![](./docs/size-16-ibv_create_cq.png)
 
 
 ## RDMA Base Command
