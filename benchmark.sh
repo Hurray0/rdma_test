@@ -3,8 +3,8 @@
 #This is a benchmark file for rdma_perf
 
 #help function
-max_size=33554432 # 32MB
-min_size=1024 # 1KB
+max_size=268435456 # 256MB
+min_size=1 # 1B
 mult_int=4
 loop_num=1000
 log_file_name=`date +"%s"`
@@ -14,8 +14,8 @@ hca="mlx5_0"
 help() {
     echo ""
     echo "Usage: $0 -M MAX_SIZE -m MIN_SIZE -p MULT_INT -l LOOP_NUM -n LOG_FILE_NAME -I SERVER_IP -P SERVER_PORT [-s]"
-    echo "example-server: $0 -M $max_size -m $min_size -p $mult_int -l $loop_num -n $log_file_name -I 127.0.0.1 -P $server -d $hca -s"
-    echo "example-client: $0 -M $max_size -m $min_size -p $mult_int -l $loop_num -n $log_file_name -I 127.0.0.1 -P $server -d $hca"
+    echo "example-server: $0 -M $max_size -m $min_size -p $mult_int -l $loop_num -n $log_file_name -I 127.0.0.1 -P $server_port -d $hca -s"
+    echo "example-client: $0 -M $max_size -m $min_size -p $mult_int -l $loop_num -n $log_file_name -I 127.0.0.1 -P $server_port -d $hca"
     echo "or all with default:"
     echo "example-server: $0 -I 127.0.0.1 -s"
     echo "example-client: $0 -I 127.0.0.1"
@@ -54,7 +54,7 @@ else
 fi
 
 #from 1B to 1GB 2 ^ 30, inteval * 4
-for ((size = $min_size; size < $max_size; size = $size * $mult_int))
+for ((size = $min_size; size <= $max_size; size = $size * $mult_int))
 do
     if [ $is_server == 1 ]; then
         log_file="$dir/size-$size.txt"
