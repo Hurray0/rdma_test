@@ -65,3 +65,7 @@ do
     fi
     server_port=$[$server_port+1]
 done
+
+# do statistics
+python3 statistics.py $log_file_name"-client"
+python3 statistics.py $log_file_name"-server"
