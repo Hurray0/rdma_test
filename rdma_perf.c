@@ -493,7 +493,7 @@ static int connect_qp(struct resources *res) {
              "ibv_query_gid");
     RDMA_CHECK(0 == rc, "could not get gid for port %d, index %d",
                config.ib_port, config.gid_idx);
-    return rc;
+    if (rc) return rc;
   } else {
     memset(&my_gid, 0, sizeof my_gid);
   }

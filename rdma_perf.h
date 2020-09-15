@@ -67,14 +67,14 @@
 
 #define RDMA_CHECK(expr, msg...)                      \
     do {                                              \
-        if (!expr) {                                  \
+        if (!(expr)) {                                \
             PRINT_ERR(msg);                           \
         }                                             \
     } while(0)
 
 #define RDMA_CHECK_GOTO(expr, msg, place)             \
     do {                                              \
-        if (!expr) {                                  \
+        if (!(expr)) {                                \
             PRINT_ERR(msg);                           \
             goto place;                               \
         }                                             \

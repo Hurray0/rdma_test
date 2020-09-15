@@ -26,7 +26,7 @@ help() {
 
 is_server=0
 
-while getopts "M:m:p:l:n:I:P:s?hd:" opt
+while getopts "M:m:p:l:n:I:P:s?hd:g:" opt
 do
     case "$opt" in
         M ) max_size=$OPTARG ;;
